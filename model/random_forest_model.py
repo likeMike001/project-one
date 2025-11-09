@@ -23,6 +23,7 @@ and inference.
 from __future__ import annotations
 
 import json
+import pickle
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -430,11 +431,15 @@ class StakingSignalTrainer:
         model.fit(X_train, y_train)
         metrics = self._evaluate(model, X_test, y_test)
 
-        self.artifacts[model_type] = {
+        artifact = {
+            "model_type": model_type,
             "model": model,
             "focus": focus,
             "feature_names": list(features.columns),
+            "imputer": self.numeric_imputer,
+            "label_classes": self.label_encoder.classes_.tolist(),
         }
+        self.artifacts[model_type] = artifact
 
         return ModelResult(
             model_type=model_type,
@@ -449,7 +454,34 @@ class StakingSignalTrainer:
     def _ensure_model_ready(self, model_type: str) -> Dict[str, Any]:
         if model_type not in self.artifacts:
             raise ValueError(f"Model '{model_type}' has not been trained yet.")
-        return self.artifacts[model_type]
+        artifact = self.artifacts[model_type]
+        if self.numeric_imputer is None and artifact.get("imputer") is not None:
+            self.numeric_imputer = artifact["imputer"]
+        return artifact
+
+    def export_model(
+        self,
+        model_type: Literal["random_forest", "xgboost"] = "random_forest",
+        output_path: str | Path = "artifacts/random_forest_model.pkl",
+    ) -> Path:
+        """
+        Persist a trained model artifact (model, imputer, label classes, focus).
+        """
+        artifact = self._ensure_model_ready(model_type)
+        bundle = {
+            "model_type": model_type,
+            "model": artifact["model"],
+            "focus": artifact["focus"],
+            "feature_names": artifact["feature_names"],
+            "numeric_imputer": artifact["imputer"],
+            "label_classes": artifact["label_classes"],
+        }
+
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("wb") as fh:
+            pickle.dump(bundle, fh)
+        return output_path
 
     def recommend_actions(
         self,
@@ -527,10 +559,13 @@ if __name__ == "__main__":
         try:
             result = trainer.train(model_type=name, focus=ui_focus)
         except ImportError as exc:
-            print(f"⚠️  Skipping {name}: {exc}")
+            print(f"[warn] Skipping {name}: {exc}")
             continue
 
         _pretty_print_metrics(name, result.metrics)
+        export_path = WORKSPACE_ROOT / "artifacts" / f"{name}_model.pkl"
+        saved_path = trainer.export_model(name, export_path)
+        print(f"Saved {name} artifact to {saved_path}")
 
     # Example: score the latest row with whichever model ran last.
     if trainer.artifacts:
