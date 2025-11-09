@@ -10,6 +10,7 @@ load_dotenv()
 app = FastAPI()
 client = Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
 
+
 class NewsRequest(BaseModel):
     topic: str
     num_articles: int = 10
@@ -24,26 +25,20 @@ def generate_news_csv(req: NewsRequest):
     prompt = f"""
 You are a CSV generator. Respond with ONLY valid CSV, no markdown, no code fences.
 
-Generate {req.num_articles} short financial news articles about {req.topic}.
-Each article should look like something from Bloomberg or Reuters.
+Generate {req.num_articles} short financial news articles specifically about Ethereum (ETH) and staking.
+Each article should resemble professional reporting from Bloomberg or Reuters.
 
 Output format:
-- First row MUST be the exact header:
-  id,topic,headline,body,source,published_at
-- Each subsequent row MUST be a CSV row with:
-  id (integer, starting from 1),
-  topic (exactly {req.topic}),
-  headline,
-  body,
-  source (exactly "synthetic_claude"),
-  published_at (ISO 8601 timestamp with Z, between 2025-01-14T00:00:00Z and 2025-11-09T00:00:00Z).
+id,topic,headline,body,source,published_at
 
-Additional rules:
-- Spread the published_at values across that date range (do NOT use the same timestamp for every row).
-- If a field contains a comma or double quote, wrap the field in double quotes and escape inner quotes by doubling them, like proper CSV.
-- Do NOT wrap the CSV in ``` backticks or markdown.
-- Do NOT include any commentary or explanation, only the raw CSV.
-    """
+Rules:
+- topic must be exactly "{req.topic}"
+- source must be exactly "synthetic_claude"
+- published_at must be an ISO 8601 timestamp between 2025-01-14T00:00:00Z and 2025-11-09T00:00:00Z
+- Spread timestamps evenly across that range
+- Use proper CSV quoting and escaping (double quotes for fields with commas or quotes)
+- No markdown, no explanations, only the raw CSV
+"""
 
     response = client.messages.create(
         model="claude-sonnet-4-5-20250929",
@@ -59,9 +54,8 @@ Additional rules:
         if csv_text.lower().startswith("csv"):
             csv_text = csv_text[3:].lstrip()
 
-    # 🔹 Save to ../data/ with timestamped filename
-    base_dir = Path(__file__).resolve().parent  # .../project-one/service
-    data_dir = base_dir.parent / "data"         # .../project-one/data
+    base_dir = Path(__file__).resolve().parent  
+    data_dir = base_dir.parent / "data" 
     data_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")

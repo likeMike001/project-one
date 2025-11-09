@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 DATA_DIR = Path("../data")
 ETH_CSV_PATH = Path("merged_eth_staking_dynamic.csv")
-NEWS_CSV_PATH = Path("../data/synthetic_news_string_20251109_060057.csv")
+NEWS_CSV_PATH = Path("../data/synthetic_news_string_20251109_074135.csv")
 OUTPUT_CSV_PATH = DATA_DIR / "final_with_sentiment.csv"
 
 

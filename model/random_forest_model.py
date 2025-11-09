@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -207,6 +208,7 @@ class StakingSignalTrainer:
         self.label_encoder = LabelEncoder()
         # Stores trained models + metadata keyed by model_type
         self.artifacts: Dict[str, Dict[str, Any]] = {}
+        self.numeric_imputer: SimpleImputer | None = None
 
     # --------------------- dataset + feature engineering -------------------- #
 
@@ -259,7 +261,7 @@ class StakingSignalTrainer:
         actions = df["future_return"].apply(self.thresholds.classify)
         return self.label_encoder.fit_transform(actions)
 
-    def _prepare_numeric(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _prepare_numeric(self, df: pd.DataFrame, *, training: bool) -> pd.DataFrame:
         numeric_cols = list(
             dict.fromkeys(
                 NUMERIC_SOURCE_COLUMNS
@@ -269,7 +271,14 @@ class StakingSignalTrainer:
         present_cols = [col for col in numeric_cols if col in df.columns]
         num_df = df[present_cols].apply(pd.to_numeric, errors="coerce")
         num_df = num_df.replace([np.inf, -np.inf], np.nan)
-        num_df = num_df.fillna(num_df.median())
+        if training:
+            self.numeric_imputer = SimpleImputer(strategy="median")
+            imputed = self.numeric_imputer.fit_transform(num_df)
+        else:
+            if self.numeric_imputer is None:
+                raise RuntimeError("Numeric imputer has not been fitted; call train() before inference.")
+            imputed = self.numeric_imputer.transform(num_df)
+        num_df = pd.DataFrame(imputed, columns=num_df.columns, index=num_df.index)
         return num_df
 
     def _prepare_categoricals(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -313,7 +322,7 @@ class StakingSignalTrainer:
         else:
             labels = None
 
-        numeric = self._prepare_numeric(working)
+        numeric = self._prepare_numeric(working, training=training)
         categoricals = self._prepare_categoricals(working)
 
         features = pd.concat([numeric, categoricals], axis=1)
