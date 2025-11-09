@@ -3,3 +3,4 @@ transformers
 pandas
 scikit-learn
 numpy
+xgboost
