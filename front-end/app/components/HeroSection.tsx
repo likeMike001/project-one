@@ -12,7 +12,7 @@ export function HeroSection({
   return (
     <section className="hero-copy glow-border rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-md lg:p-12">
       <p className="mb-4 text-sm uppercase tracking-[0.4em] text-slate-300">
-        Ethereum Alpha Console
+        Stake-Inspector
       </p>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-4">
